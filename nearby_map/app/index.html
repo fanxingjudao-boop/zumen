@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>名古屋オフライン地図（地理院タイル）</title>
+    <style>
+      html, body { height: 100%; margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; overflow: hidden; }
+      #topbar { height: 56px; display:flex; align-items:center; justify-content:space-between; gap:16px; padding: 0 16px; border-bottom:1px solid #e2e8f0; background:#fff; }
+      .left { display:flex; align-items:center; gap:12px; }
+      .title { font-weight:700; }
+      .controls { display:flex; align-items:center; gap:8px; }
+      button { border:1px solid #cbd5e1; background:#fff; border-radius:8px; padding:6px 10px; cursor:pointer; }
+      button:disabled { opacity:0.45; cursor:not-allowed; }
+      #map { position:relative; height: calc(100% - 56px); overflow:hidden; background:#f8fafc; cursor:grab; touch-action:none; }
+      #map.dragging { cursor:grabbing; }
+      .tile { position:absolute; width:256px; height:256px; image-rendering:crisp-edges; user-select:none; pointer-events:none; }
+      #attrib, #coords {
+        position:absolute; z-index: 1200; background: rgba(255,255,255,0.9); border:1px solid #cbd5e1; border-radius:6px; padding:4px 8px; font-size:12px;
+      }
+      #attrib { left:10px; bottom:10px; }
+      #coords { right:10px; bottom:10px; }
+      #loadingOverlay, #errorOverlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:2000; background:rgba(255,255,255,0.92); }
+      #loadingOverlay.hidden, #errorOverlay.hidden { display:none; }
+      .panel { max-width:680px; background:#fff; border:1px solid #cbd5e1; border-radius:12px; padding:16px; box-shadow: 0 10px 24px rgba(15,23,42,0.08); }
+      .panel h2 { margin:0 0 8px; font-size:1.1rem; }
+      .muted { color:#475569; font-size:0.95rem; white-space:pre-wrap; }
+      .status-ok { color:#16a34a; font-weight:700; }
+    </style>
+  </head>
+  <body>
+    <div id="topbar">
+      <div class="left">
+        <div class="title">名古屋オフライン地図</div>
+        <div id="zoomDisplay" class="status-ok">Zoom: -</div>
+      </div>
+      <div class="controls">
+        <button id="zoomOutBtn" type="button">-</button>
+        <button id="zoomInBtn" type="button">+</button>
+        <button id="resetBtn" type="button">Reset</button>
+      </div>
+    </div>
+
+    <div id="map">
+      <div id="loadingOverlay">
+        <div class="panel">
+          <h2>地図を初期化しています...</h2>
+          <div class="muted">config.json とローカルタイルを読み込み中です。</div>
+        </div>
+      </div>
+
+      <div id="errorOverlay" class="hidden">
+        <div class="panel">
+          <h2>初期化エラー</h2>
+          <div id="errorText" class="muted"></div>
+        </div>
+      </div>
+
+      <div id="attrib"></div>
+      <div id="coords"></div>
+    </div>
+
+    <script>
+      const CFG_URL = "../config.json";
+      const TILE_SIZE = 256;
+
+      const mapEl = document.getElementById("map");
+      const attribEl = document.getElementById("attrib");
+      const coordsEl = document.getElementById("coords");
+      const zoomDisplayEl = document.getElementById("zoomDisplay");
+      const zoomInBtn = document.getElementById("zoomInBtn");
+      const zoomOutBtn = document.getElementById("zoomOutBtn");
+      const resetBtn = document.getElementById("resetBtn");
+      const loadingOverlay = document.getElementById("loadingOverlay");
+      const errorOverlay = document.getElementById("errorOverlay");
+      const errorText = document.getElementById("errorText");
+
+      let cfg;
+      let z;
+      let centerLat;
+      let centerLon;
+      let originX = 0;
+      let originY = 0;
+      let isDragging = false;
+      let dragStart = null;
+      let originStart = null;
+
+      function lon2x(lon, zoom) { return (lon + 180) / 360 * (TILE_SIZE * Math.pow(2, zoom)); }
+      function lat2y(lat, zoom) {
+        const rad = lat * Math.PI / 180;
+        const a = Math.log(Math.tan(Math.PI / 4 + rad / 2));
+        return (1 - a / Math.PI) / 2 * (TILE_SIZE * Math.pow(2, zoom));
+      }
+      function x2lon(x, zoom) { return x / (TILE_SIZE * Math.pow(2, zoom)) * 360 - 180; }
+      function y2lat(y, zoom) {
+        const n = Math.PI - 2 * Math.PI * y / (TILE_SIZE * Math.pow(2, zoom));
+        return (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+      }
+
+      function showError(message) {
+        loadingOverlay.classList.add("hidden");
+        errorText.textContent = message;
+        errorOverlay.classList.remove("hidden");
+      }
+
+      function hideLoading() {
+        loadingOverlay.classList.add("hidden");
+      }
+
+      function clearTiles() {
+        mapEl.querySelectorAll("img.tile").forEach((el) => el.remove());
+      }
+
+      function clampOrigin() {
+        const world = TILE_SIZE * Math.pow(2, z);
+        const w = mapEl.clientWidth;
+        const h = mapEl.clientHeight;
+        originX = Math.max(0, Math.min(originX, Math.max(0, world - w)));
+        originY = Math.max(0, Math.min(originY, Math.max(0, world - h)));
+      }
+
+      function updateCenterFromOrigin() {
+        const cx = originX + mapEl.clientWidth / 2;
+        const cy = originY + mapEl.clientHeight / 2;
+        centerLon = x2lon(cx, z);
+        centerLat = y2lat(cy, z);
+      }
+
+      function updateCoords() {
+        coordsEl.textContent = `lat: ${centerLat.toFixed(6)} / lon: ${centerLon.toFixed(6)}`;
+      }
+
+      function render() {
+        zoomDisplayEl.textContent = `Zoom: ${z}`;
+        attribEl.textContent = cfg.tiles.attribution;
+        zoomInBtn.disabled = (z >= cfg.zoom.max);
+        zoomOutBtn.disabled = (z <= cfg.zoom.min);
+
+        clearTiles();
+
+        const w = mapEl.clientWidth;
+        const h = mapEl.clientHeight;
+        const left = originX;
+        const top = originY;
+        const right = originX + w;
+        const bottom = originY + h;
+
+        const x0 = Math.floor(left / TILE_SIZE);
+        const y0 = Math.floor(top / TILE_SIZE);
+        const x1 = Math.floor((right - 1) / TILE_SIZE);
+        const y1 = Math.floor((bottom - 1) / TILE_SIZE);
+        const maxTiles = Math.pow(2, z);
+
+        for (let tx = x0; tx <= x1; tx += 1) {
+          for (let ty = y0; ty <= y1; ty += 1) {
+            if (tx < 0 || tx >= maxTiles || ty < 0 || ty >= maxTiles) continue;
+            const tilePath = cfg.tiles.local_template
+              .replace("{z}", String(z))
+              .replace("{x}", String(tx))
+              .replace("{y}", String(ty));
+            const img = document.createElement("img");
+            img.className = "tile";
+            img.style.left = `${tx * TILE_SIZE - originX}px`;
+            img.style.top = `${ty * TILE_SIZE - originY}px`;
+            img.src = `../${tilePath}`;
+            img.alt = "";
+            img.onerror = () => { img.style.display = "none"; };
+            mapEl.appendChild(img);
+          }
+        }
+
+        updateCenterFromOrigin();
+        updateCoords();
+      }
+
+      function setCenter(lat, lon) {
+        centerLat = lat;
+        centerLon = lon;
+        const cx = lon2x(centerLon, z);
+        const cy = lat2y(centerLat, z);
+        originX = cx - mapEl.clientWidth / 2;
+        originY = cy - mapEl.clientHeight / 2;
+        clampOrigin();
+        render();
+      }
+
+      function applyZoom(nextZoom) {
+        if (nextZoom < cfg.zoom.min || nextZoom > cfg.zoom.max || nextZoom === z) return;
+        z = nextZoom;
+        setCenter(centerLat, centerLon);
+      }
+
+      function bindEvents() {
+        zoomInBtn.addEventListener("click", () => applyZoom(z + 1));
+        zoomOutBtn.addEventListener("click", () => applyZoom(z - 1));
+        resetBtn.addEventListener("click", () => {
+          z = cfg.zoom.default;
+          setCenter(cfg.center.lat, cfg.center.lon);
+        });
+
+        mapEl.addEventListener("mousedown", (e) => {
+          isDragging = true;
+          dragStart = { x: e.clientX, y: e.clientY };
+          originStart = { x: originX, y: originY };
+          mapEl.classList.add("dragging");
+        });
+
+        window.addEventListener("mousemove", (e) => {
+          if (!isDragging) return;
+          originX = originStart.x - (e.clientX - dragStart.x);
+          originY = originStart.y - (e.clientY - dragStart.y);
+          clampOrigin();
+          render();
+        });
+
+        window.addEventListener("mouseup", () => {
+          isDragging = false;
+          mapEl.classList.remove("dragging");
+        });
+
+        mapEl.addEventListener("wheel", (e) => {
+          e.preventDefault();
+          applyZoom(z + (e.deltaY < 0 ? 1 : -1));
+        }, { passive: false });
+
+        let touchStart = null;
+        mapEl.addEventListener("touchstart", (e) => {
+          if (e.touches.length !== 1) return;
+          touchStart = {
+            x: e.touches[0].clientX,
+            y: e.touches[0].clientY,
+            originX,
+            originY,
+          };
+        }, { passive: true });
+
+        mapEl.addEventListener("touchmove", (e) => {
+          if (!touchStart || e.touches.length !== 1) return;
+          e.preventDefault();
+          originX = touchStart.originX - (e.touches[0].clientX - touchStart.x);
+          originY = touchStart.originY - (e.touches[0].clientY - touchStart.y);
+          clampOrigin();
+          render();
+        }, { passive: false });
+
+        mapEl.addEventListener("touchend", () => { touchStart = null; });
+        window.addEventListener("resize", () => setCenter(centerLat, centerLon));
+      }
+
+      async function init() {
+        try {
+          const response = await fetch(CFG_URL);
+          if (!response.ok) throw new Error(`config.json の読み込み失敗 (${response.status})`);
+          cfg = await response.json();
+
+          if (!cfg.center || !cfg.zoom || !cfg.tiles || !cfg.tiles.local_template) {
+            throw new Error("config.json の形式が不正です");
+          }
+
+          z = cfg.zoom.default;
+          centerLat = cfg.center.lat;
+          centerLon = cfg.center.lon;
+
+          bindEvents();
+          hideLoading();
+          setCenter(centerLat, centerLon);
+        } catch (err) {
+          showError(`初期化に失敗しました: ${err.message}\n\n` +
+            "HTTPサーバー経由で開いているか、config.jsonの配置が正しいか確認してください。");
+        }
+      }
+
+      init();
+    </script>
+  </body>
+</html>
