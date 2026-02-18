@@ -1,0 +1,24 @@
+{
+  "name": "Nagoya (GSI tiles) Offline Map",
+  "center": {
+    "lat": 35.1706431,
+    "lon": 136.8816945
+  },
+  "zoom": {
+    "min": 11,
+    "max": 16,
+    "default": 13
+  },
+  "bbox_wgs84": {
+    "west": 136.6,
+    "south": 35.0,
+    "east": 137.1,
+    "north": 35.35
+  },
+  "tiles": {
+    "data_id": "std",
+    "source_template": "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png",
+    "local_template": "tiles/std/{z}/{x}/{y}.png",
+    "attribution": "出典：地理院タイル（国土地理院）"
+  }
+}
