@@ -19,6 +19,30 @@
     "data_id": "std",
     "source_template": "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png",
     "local_template": "tiles/std/{z}/{x}/{y}.png",
-    "attribution": "出典：地理院タイル（国土地理院）"
-  }
+    "attribution": "出典：地理院タイル（国土地理院）",
+    "terms_url": "https://maps.gsi.go.jp/help/use.html"
+  },
+  "hazard_layers": [
+    {
+      "id": "flood_l2",
+      "name": "洪水浸水想定（想定最大規模）",
+      "template": "https://disaportaldata.gsi.go.jp/raster/01_flood_l2_shinsuishin/{z}/{x}/{y}.png",
+      "opacity": 0.55,
+      "source": "重ねるハザードマップ（国土交通省）"
+    },
+    {
+      "id": "hightide_l2",
+      "name": "高潮浸水想定",
+      "template": "https://disaportaldata.gsi.go.jp/raster/03_hightide_l2_shinsuishin/{z}/{x}/{y}.png",
+      "opacity": 0.5,
+      "source": "重ねるハザードマップ（国土交通省）"
+    },
+    {
+      "id": "dosha",
+      "name": "土砂災害警戒区域",
+      "template": "https://disaportaldata.gsi.go.jp/raster/05_kyukeisya/{z}/{x}/{y}.png",
+      "opacity": 0.55,
+      "source": "重ねるハザードマップ（国土交通省）"
+    }
+  ]
 }

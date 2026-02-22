@@ -29,3 +29,10 @@ python3 -m http.server 8000
 
 - `http://localhost:8000/app/`
 - `http://localhost:8000/blueprint_map/app/`
+
+
+## 公開URLで確認する場合
+
+- `.../app/?mode=online` でオンラインタイル表示
+
+- 公開前に `config.json` の `tiles.terms_url` から利用規約を確認

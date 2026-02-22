@@ -97,7 +97,29 @@ def validate_tiles(tiles: dict) -> list[str]:
         errors.append("tiles.source_template is required")
     if "attribution" not in tiles or not str(tiles["attribution"]).strip():
         errors.append("tiles.attribution is required (legal requirement for GSI tiles)")
+    terms_url = str(tiles.get("terms_url", "")).strip()
+    if not terms_url:
+        errors.append("tiles.terms_url is required (confirm GSI terms before publish)")
+    elif not (terms_url.startswith("https://") or terms_url.startswith("http://")):
+        errors.append("tiles.terms_url must be a valid URL")
 
+    return errors
+
+
+def validate_hazard_layers(layers: list) -> list[str]:
+    errors: list[str] = []
+    if not isinstance(layers, list):
+        return ["hazard_layers must be an array"]
+    for idx, layer in enumerate(layers):
+        if not isinstance(layer, dict):
+            errors.append(f"hazard_layers[{idx}] must be an object")
+            continue
+        for key in ("id", "name", "template", "source"):
+            if not str(layer.get(key, "")).strip():
+                errors.append(f"hazard_layers[{idx}].{key} is required")
+        tpl = str(layer.get("template", ""))
+        if any(ph not in tpl for ph in ("{z}", "{x}", "{y}")):
+            errors.append(f"hazard_layers[{idx}].template must contain {{z}}, {{x}}, {{y}}")
     return errors
 
 
@@ -141,6 +163,16 @@ def main() -> None:
                 print(f"  - {err}")
         else:
             print(f"✓ {key}: Valid")
+
+    if "hazard_layers" in cfg:
+        hz_errors = validate_hazard_layers(cfg["hazard_layers"])
+        all_errors.extend(hz_errors)
+        if hz_errors:
+            print("❌ hazard_layers: Invalid")
+            for err in hz_errors:
+                print(f"  - {err}")
+        else:
+            print("✓ hazard_layers: Valid")
 
     print()
     print("=" * 60)
