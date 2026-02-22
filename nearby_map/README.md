@@ -61,3 +61,30 @@ python3 -m http.server 8000
 - 画面幅が狭い場合、上部操作バーは2段表示になります。
 - ハザードパネルは初期で折りたたみ、必要時に展開できます。
 - ボタンサイズを拡大し、タッチ操作しやすくしています。
+
+
+## Windows（PowerShell）での実行
+
+`python3` が見つからない場合は、Windows では `py` ランチャーを使ってください。
+
+```powershell
+cd nearby_map
+py -3 validate_config.py
+py -3 download_tiles.py --dry-run
+py -3 -m http.server 8000
+```
+
+### `py` も使えない場合
+
+1. Python公式サイトからPython 3.10+ をインストール
+2. インストーラの `Add python.exe to PATH` を有効化
+3. PowerShell を再起動して確認
+
+```powershell
+py -3 --version
+# または
+python --version
+```
+
+Microsoft Store のエイリアスが邪魔する場合は、
+`設定 > アプリ > アプリ実行エイリアス` で `python.exe` / `python3.exe` をオフにしてください。

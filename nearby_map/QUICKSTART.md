@@ -36,3 +36,16 @@ python3 -m http.server 8000
 - `.../app/?mode=online` でオンラインタイル表示
 
 - 公開前に `config.json` の `tiles.terms_url` から利用規約を確認
+
+
+## Windowsで `python3` が使えない場合
+
+PowerShell では次を使ってください。
+
+```powershell
+py -3 validate_config.py
+py -3 download_tiles.py --dry-run
+py -3 -m http.server 8000
+```
+
+`py` がない場合はPythonをインストールし、`Add python.exe to PATH` を有効にしてください。
