@@ -49,3 +49,12 @@ py -3 -m http.server 8000
 ```
 
 `py` がない場合はPythonをインストールし、`Add python.exe to PATH` を有効にしてください。
+
+
+## ズーム別の収集範囲を確認
+
+```bash
+python3 download_tiles.py --dry-run
+```
+
+`z12までは全国、z13以上は名古屋` の方針で枚数が表示されます。

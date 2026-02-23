@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download GSI XYZ tiles for offline Nagoya map."""
+"""Download GSI XYZ tiles for offline map with nationwide+local policy."""
 
 from __future__ import annotations
 
@@ -85,27 +85,60 @@ def validate_config(cfg: dict) -> list[str]:
     if any(p not in tiles.get("source_template", "") for p in ("{z}", "{x}", "{y}")):
         errors.append("tiles.source_template must contain {z}/{x}/{y}")
 
+    policy = cfg.get("offline_collection_policy", {})
+    nz = policy.get("nationwide_until_zoom")
+    if nz is not None and not (zmin <= nz <= zmax):
+        errors.append("offline_collection_policy.nationwide_until_zoom must be within zoom range")
+
     return errors
 
 
-def estimate_tile_count(bbox: dict, zmin: int, zmax: int) -> int:
+def normalize_tile_range(bbox: dict, z: int) -> tuple[int, int, int, int]:
+    x0 = lon2tilex(bbox["west"], z)
+    x1 = lon2tilex(bbox["east"], z)
+    y0 = lat2tiley(bbox["north"], z)
+    y1 = lat2tiley(bbox["south"], z)
+    if x1 < x0:
+        x0, x1 = x1, x0
+    if y1 < y0:
+        y0, y1 = y1, y0
+    return x0, x1, y0, y1
+
+
+def estimate_tile_count_for_bbox(bbox: dict, zmin: int, zmax: int) -> int:
     total = 0
     for z in range(zmin, zmax + 1):
-        x0 = lon2tilex(bbox["west"], z)
-        x1 = lon2tilex(bbox["east"], z)
-        y0 = lat2tiley(bbox["north"], z)
-        y1 = lat2tiley(bbox["south"], z)
-        if x1 < x0:
-            x0, x1 = x1, x0
-        if y1 < y0:
-            y0, y1 = y1, y0
+        x0, x1, y0, y1 = normalize_tile_range(bbox, z)
         total += (x1 - x0 + 1) * (y1 - y0 + 1)
     return total
 
 
+def bbox_for_zoom(cfg: dict, z: int) -> tuple[dict, str]:
+    policy = cfg.get("offline_collection_policy", {})
+    nz = policy.get("nationwide_until_zoom")
+    jp = cfg.get("bbox_japan_wgs84")
+
+    if isinstance(nz, int) and jp and z <= nz:
+        return jp, "nationwide"
+    return cfg["bbox_wgs84"], "nagoya"
+
+
+def estimate_mixed_collection(cfg: dict) -> tuple[int, dict[int, tuple[str, int]]]:
+    zmin = cfg["zoom"]["min"]
+    zmax = cfg["zoom"]["max"]
+    by_zoom: dict[int, tuple[str, int]] = {}
+    total = 0
+    for z in range(zmin, zmax + 1):
+        bbox, scope = bbox_for_zoom(cfg, z)
+        x0, x1, y0, y1 = normalize_tile_range(bbox, z)
+        c = (x1 - x0 + 1) * (y1 - y0 + 1)
+        by_zoom[z] = (scope, c)
+        total += c
+    return total, by_zoom
+
+
 def download(url: str, out_path: Path, timeout: int = 30, retry: int = 0) -> str:
     out_path.parent.mkdir(parents=True, exist_ok=True)
-
     if out_path.exists():
         return "skip"
 
@@ -146,20 +179,27 @@ def main() -> None:
 
     print("✓ Configuration validated")
 
-    bbox = cfg["bbox_wgs84"]
     zmin = cfg["zoom"]["min"]
     zmax = cfg["zoom"]["max"]
     src_tpl = cfg["tiles"]["source_template"]
     local_tpl = cfg["tiles"]["local_template"]
 
-    estimated = estimate_tile_count(bbox, zmin, zmax)
+    estimated, by_zoom = estimate_mixed_collection(cfg)
+    nagoya_only = estimate_tile_count_for_bbox(cfg["bbox_wgs84"], zmin, zmax)
 
-    print()
-    print("Configuration:")
-    print(f"  Area: ({bbox['west']:.3f}, {bbox['south']:.3f}) to ({bbox['east']:.3f}, {bbox['north']:.3f})")
+    print("\nCollection policy:")
+    print(f"  Nagoya bbox: {cfg['bbox_wgs84']}")
+    if "bbox_japan_wgs84" in cfg and "offline_collection_policy" in cfg:
+        nz = cfg["offline_collection_policy"].get("nationwide_until_zoom")
+        print(f"  Nationwide bbox until zoom {nz}: {cfg['bbox_japan_wgs84']}")
     print(f"  Zoom: {zmin} - {zmax}")
     print(f"  Source: {src_tpl}")
-    print(f"\nEstimated tiles: {estimated:,}")
+    print(f"\nEstimated tiles (mixed policy): {estimated:,}")
+    print(f"Estimated tiles (Nagoya only): {nagoya_only:,}")
+    print("By zoom:")
+    for z in range(zmin, zmax + 1):
+        scope, c = by_zoom[z]
+        print(f"  z{z}: {scope} {c:,} tiles")
 
     if args.dry_run:
         print("\nDry run complete.")
@@ -177,20 +217,13 @@ def main() -> None:
     all_start = time.time()
 
     for z in range(zmin, zmax + 1):
-        x0 = lon2tilex(bbox["west"], z)
-        x1 = lon2tilex(bbox["east"], z)
-        y0 = lat2tiley(bbox["north"], z)
-        y1 = lat2tiley(bbox["south"], z)
-
-        if x1 < x0:
-            x0, x1 = x1, x0
-        if y1 < y0:
-            y0, y1 = y1, y0
+        bbox, scope = bbox_for_zoom(cfg, z)
+        x0, x1, y0, y1 = normalize_tile_range(bbox, z)
 
         z_total = (x1 - x0 + 1) * (y1 - y0 + 1)
         z_count = 0
         z_start = time.time()
-        print(f"[Zoom {z}] Tiles: {z_total:,} ({x0}-{x1} x {y0}-{y1})")
+        print(f"[Zoom {z} / {scope}] Tiles: {z_total:,} ({x0}-{x1} x {y0}-{y1})")
 
         for x in range(x0, x1 + 1):
             for y in range(y0, y1 + 1):

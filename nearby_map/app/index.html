@@ -137,6 +137,8 @@
         <button id="zoomOutBtn">-</button>
         <button id="zoomInBtn">+</button>
         <button id="resetBtn">Reset</button>
+        <button id="layersOnBtn">全ON</button>
+        <button id="layersOffBtn">全OFF</button>
       </div>
     </div>
 
@@ -149,6 +151,7 @@
         <button id="hazardPanelToggle">ハザードレイヤー表示/非表示</button>
         <div id="hazardBody" class="hazard-body">
           <h4>防災訓練向けハザードレイヤー</h4>
+          <div class="muted">操作: ドラッグ移動 / ホイール拡大縮小 / Resetで中心復帰</div>
           <div id="hazardControls"></div>
           <div id="hazardStatus" class="muted"></div>
         </div>
@@ -174,6 +177,8 @@
       const zoomInBtn = document.getElementById("zoomInBtn");
       const zoomOutBtn = document.getElementById("zoomOutBtn");
       const resetBtn = document.getElementById("resetBtn");
+      const layersOnBtn = document.getElementById("layersOnBtn");
+      const layersOffBtn = document.getElementById("layersOffBtn");
       const loadingOverlay = document.getElementById("loadingOverlay");
       const errorOverlay = document.getElementById("errorOverlay");
       const errorText = document.getElementById("errorText");
@@ -319,6 +324,8 @@
         zoomOutBtn.onclick = () => applyZoom(z - 1);
         resetBtn.onclick = () => { z = cfg.zoom.default; setCenter(cfg.center.lat, cfg.center.lon); };
         hazardPanelToggle.onclick = () => hazardBody.classList.toggle("collapsed");
+        layersOnBtn.onclick = () => { (cfg.hazard_layers || []).forEach((l) => activeHazards.add(l.id)); renderHazardControls(); render(); };
+        layersOffBtn.onclick = () => { activeHazards.clear(); renderHazardControls(); render(); };
 
         mapEl.addEventListener("mousedown", (e) => {
           isDragging = true;
@@ -357,6 +364,11 @@
 
         mapEl.addEventListener("touchend", () => { touchStart = null; });
         window.addEventListener("resize", () => setCenter(centerLat, centerLon));
+        window.addEventListener("keydown", (e) => {
+          if (e.key === "+" || e.key === "=") applyZoom(z + 1);
+          if (e.key === "-" || e.key === "_") applyZoom(z - 1);
+          if (e.key.toLowerCase() === "r") { z = cfg.zoom.default; setCenter(cfg.center.lat, cfg.center.lon); }
+        });
       }
 
       async function init() {

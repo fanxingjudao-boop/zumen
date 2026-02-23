@@ -44,5 +44,15 @@
       "opacity": 0.55,
       "source": "重ねるハザードマップ（国土交通省）"
     }
-  ]
+  ],
+  "bbox_japan_wgs84": {
+    "west": 122.0,
+    "south": 20.0,
+    "east": 154.0,
+    "north": 46.0
+  },
+  "offline_collection_policy": {
+    "nationwide_until_zoom": 12,
+    "note": "z12までは全国収集。z13以上は名古屋bboxのみ収集。"
+  }
 }

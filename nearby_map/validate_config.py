@@ -123,6 +123,27 @@ def validate_hazard_layers(layers: list) -> list[str]:
     return errors
 
 
+def validate_offline_policy(policy: dict, zoom: dict) -> list[str]:
+    errors: list[str] = []
+    if not isinstance(policy, dict):
+        return ["offline_collection_policy must be an object"]
+
+    if "nationwide_until_zoom" not in policy:
+        return ["offline_collection_policy.nationwide_until_zoom is required"]
+
+    nz = policy["nationwide_until_zoom"]
+    if not isinstance(nz, int):
+        errors.append("offline_collection_policy.nationwide_until_zoom must be integer")
+        return errors
+
+    zmin = zoom.get("min")
+    zmax = zoom.get("max")
+    if isinstance(zmin, int) and isinstance(zmax, int) and not (zmin <= nz <= zmax):
+        errors.append(f"offline_collection_policy.nationwide_until_zoom ({nz}) must be between zoom.min ({zmin}) and zoom.max ({zmax})")
+
+    return errors
+
+
 def main() -> None:
     print("=" * 60)
     print("Configuration Validator")
@@ -163,6 +184,26 @@ def main() -> None:
                 print(f"  - {err}")
         else:
             print(f"✓ {key}: Valid")
+
+    if "bbox_japan_wgs84" in cfg:
+        jp_errors = validate_bbox(cfg["bbox_japan_wgs84"])
+        all_errors.extend(jp_errors)
+        if jp_errors:
+            print("❌ bbox_japan_wgs84: Invalid")
+            for err in jp_errors:
+                print(f"  - {err}")
+        else:
+            print("✓ bbox_japan_wgs84: Valid")
+
+    if "offline_collection_policy" in cfg:
+        pol_errors = validate_offline_policy(cfg["offline_collection_policy"], cfg.get("zoom", {}))
+        all_errors.extend(pol_errors)
+        if pol_errors:
+            print("❌ offline_collection_policy: Invalid")
+            for err in pol_errors:
+                print(f"  - {err}")
+        else:
+            print("✓ offline_collection_policy: Valid")
 
     if "hazard_layers" in cfg:
         hz_errors = validate_hazard_layers(cfg["hazard_layers"])

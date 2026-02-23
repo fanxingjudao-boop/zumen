@@ -88,3 +88,16 @@ python --version
 
 Microsoft Store のエイリアスが邪魔する場合は、
 `設定 > アプリ > アプリ実行エイリアス` で `python.exe` / `python3.exe` をオフにしてください。
+
+
+## 全国+名古屋のハイブリッド収集方針
+
+- `offline_collection_policy.nationwide_until_zoom` まで（既定: z12）は全国bboxを収集
+- それより詳細ズーム（z13以上）は名古屋bboxのみ収集
+- `download_tiles.py --dry-run` でズーム別枚数を確認できます
+
+
+## 操作性向上ポイント
+
+- ハザードレイヤーを `全ON` / `全OFF` で一括切替可能
+- キーボード操作: `+`/`-` でズーム、`r` で中心リセット
