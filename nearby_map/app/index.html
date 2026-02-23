@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>名古屋オフライン地図（地理院タイル）</title>
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        overflow: hidden;
+      }
+      #topbar {
+        min-height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 12px;
+        border-bottom: 1px solid #e2e8f0;
+        background: #fff;
+      }
+      .left, .controls { display: flex; align-items: center; gap: 8px; }
+      .left { flex-wrap: wrap; }
+      .title { font-weight: 700; }
+      .badge { font-size: 12px; border: 1px solid #cbd5e1; border-radius: 999px; padding: 2px 8px; }
+      button, a.btn {
+        border: 1px solid #cbd5e1;
+        background: #fff;
+        border-radius: 8px;
+        padding: 8px 10px;
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+        font-size: 14px;
+        min-height: 38px;
+      }
+      #map {
+        position: relative;
+        height: calc(100% - 73px);
+        overflow: hidden;
+        background: #f8fafc;
+        cursor: grab;
+        touch-action: none;
+      }
+      #map.dragging { cursor: grabbing; }
+      .tile, .hazard-tile {
+        position: absolute;
+        width: 256px;
+        height: 256px;
+        pointer-events: none;
+      }
+      .hazard-tile { mix-blend-mode: multiply; }
+      #focusMarker {
+        position: absolute;
+        z-index: 1500;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #dc2626;
+        border: 2px solid #fff;
+        box-shadow: 0 0 0 2px rgba(220,38,38,.35);
+        transform: translate(-50%, -50%);
+        display: none;
+      }
+      #focusLabel {
+        position: absolute;
+        z-index: 1501;
+        transform: translate(-50%, -120%);
+        background: rgba(255,255,255,.95);
+        border: 1px solid #fca5a5;
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 12px;
+        white-space: nowrap;
+        display: none;
+      }
+      #hazardPanel {
+        position: absolute;
+        right: 10px;
+        top: 10px;
+        z-index: 1300;
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        padding: 8px 10px;
+        font-size: 12px;
+        min-width: 270px;
+        max-width: min(86vw, 360px);
+      }
+      #hazardPanel h4 { margin: 0 0 6px; }
+      .hazard-body.collapsed { display: none; }
+      .hz-row { display: flex; justify-content: space-between; gap: 8px; margin: 4px 0; }
+      #hazardPanelToggle { width: 100%; margin-bottom: 6px; }
+      #attrib, #coords, #tileNotice {
+        position: absolute;
+        z-index: 1200;
+        background: rgba(255,255,255,0.9);
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+      #attrib { left: 10px; bottom: 10px; max-width: 70vw; }
+      #coords { right: 10px; bottom: 10px; }
+      #tileNotice {
+        left: 10px;
+        top: 10px;
+        display: none;
+        color: #92400e;
+        background: #fffbeb;
+        border-color: #fcd34d;
+      }
+      #loadingOverlay, #errorOverlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        background: rgba(255,255,255,0.92);
+      }
+      #loadingOverlay.hidden, #errorOverlay.hidden { display: none; }
+      .panel {
+        width: min(92vw, 720px);
+        background: #fff;
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        padding: 16px;
+      }
+      .muted { color: #475569; white-space: pre-wrap; }
+
+      @media (max-width: 820px) {
+        #topbar { align-items: flex-start; flex-direction: column; }
+        .controls { width: 100%; justify-content: space-between; flex-wrap: wrap; }
+        #map { height: calc(100% - 118px); }
+        #hazardPanel {
+          left: 8px;
+          right: 8px;
+          top: auto;
+          bottom: 64px;
+          min-width: 0;
+          max-width: none;
+        }
+        .hz-row { flex-direction: column; gap: 2px; }
+        #coords { left: 10px; right: auto; bottom: 10px; }
+        #attrib { right: 10px; left: auto; bottom: 10px; max-width: 60vw; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="topbar">
+      <div class="left">
+        <div class="title">名古屋オフライン地図</div>
+        <div id="zoomDisplay">Zoom: -</div>
+        <div id="modeBadge" class="badge"></div>
+      </div>
+      <div class="controls">
+        <a id="toggleModeLink" class="btn" href="#"></a>
+        <button id="zoomOutBtn">-</button>
+        <button id="zoomInBtn">+</button>
+        <button id="resetBtn">Reset</button>
+        <button id="layersOnBtn">全ON</button>
+        <button id="layersOffBtn">全OFF</button>
+      </div>
+    </div>
+
+    <div id="map">
+      <div id="loadingOverlay"><div class="panel"><h2>地図を初期化しています...</h2><div class="muted">設定とレイヤー情報を読み込み中です。</div></div></div>
+      <div id="errorOverlay" class="hidden"><div class="panel"><h2>初期化エラー</h2><div id="errorText" class="muted"></div></div></div>
+      <div id="tileNotice">ローカルタイルが見つからないため、空白領域があります。</div>
+
+      <aside id="hazardPanel">
+        <button id="hazardPanelToggle">ハザードレイヤー表示/非表示</button>
+        <div id="hazardBody" class="hazard-body">
+          <h4>防災訓練向けハザードレイヤー</h4>
+          <div class="muted">操作: ドラッグ移動 / ホイール拡大縮小 / Resetで中心復帰</div>
+          <div id="hazardControls"></div>
+          <div id="hazardStatus" class="muted"></div>
+        </div>
+      </aside>
+
+      <div id="focusMarker"></div>
+      <div id="focusLabel"></div>
+      <div id="attrib"></div>
+      <div id="coords"></div>
+    </div>
+
+    <script>
+      const CFG_URL = "../config.json";
+      const TILE_SIZE = 256;
+      const params = new URLSearchParams(location.search);
+      const mode = params.get("mode") === "online" ? "online" : "offline";
+
+      const mapEl = document.getElementById("map");
+      const hazardControls = document.getElementById("hazardControls");
+      const hazardStatus = document.getElementById("hazardStatus");
+      const hazardBody = document.getElementById("hazardBody");
+      const hazardPanelToggle = document.getElementById("hazardPanelToggle");
+      const attribEl = document.getElementById("attrib");
+      const coordsEl = document.getElementById("coords");
+      const zoomDisplayEl = document.getElementById("zoomDisplay");
+      const zoomInBtn = document.getElementById("zoomInBtn");
+      const zoomOutBtn = document.getElementById("zoomOutBtn");
+      const resetBtn = document.getElementById("resetBtn");
+      const layersOnBtn = document.getElementById("layersOnBtn");
+      const layersOffBtn = document.getElementById("layersOffBtn");
+      const loadingOverlay = document.getElementById("loadingOverlay");
+      const errorOverlay = document.getElementById("errorOverlay");
+      const errorText = document.getElementById("errorText");
+      const modeBadge = document.getElementById("modeBadge");
+      const toggleModeLink = document.getElementById("toggleModeLink");
+      const tileNotice = document.getElementById("tileNotice");
+      const focusMarker = document.getElementById("focusMarker");
+      const focusLabel = document.getElementById("focusLabel");
+
+      let cfg, z, centerLat, centerLon, originX = 0, originY = 0, isDragging = false, dragStart = null, originStart = null;
+      let activeHazards = new Set();
+      let focus = null;
+
+      const lon2x = (lon, zoom) => (lon + 180) / 360 * (TILE_SIZE * Math.pow(2, zoom));
+      const lat2y = (lat, zoom) => {
+        const r = lat * Math.PI / 180;
+        const a = Math.log(Math.tan(Math.PI / 4 + r / 2));
+        return (1 - a / Math.PI) / 2 * (TILE_SIZE * Math.pow(2, zoom));
+      };
+      const x2lon = (x, zoom) => x / (TILE_SIZE * Math.pow(2, zoom)) * 360 - 180;
+      const y2lat = (y, zoom) => {
+        const n = Math.PI - 2 * Math.PI * y / (TILE_SIZE * Math.pow(2, zoom));
+        return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+      };
+
+      function showError(msg) {
+        loadingOverlay.classList.add("hidden");
+        errorText.textContent = msg;
+        errorOverlay.classList.remove("hidden");
+      }
+
+      function clearTiles() {
+        mapEl.querySelectorAll("img.tile,img.hazard-tile").forEach((e) => e.remove());
+      }
+
+      function clampOrigin() {
+        const world = TILE_SIZE * Math.pow(2, z);
+        const w = mapEl.clientWidth;
+        const h = mapEl.clientHeight;
+        originX = Math.max(0, Math.min(originX, Math.max(0, world - w)));
+        originY = Math.max(0, Math.min(originY, Math.max(0, world - h)));
+      }
+
+      function updateCenterFromOrigin() {
+        const cx = originX + mapEl.clientWidth / 2;
+        const cy = originY + mapEl.clientHeight / 2;
+        centerLon = x2lon(cx, z);
+        centerLat = y2lat(cy, z);
+      }
+
+      
+      function parseFocusFromQuery() {
+        const lat = Number(params.get("lat"));
+        const lon = Number(params.get("lon"));
+        const zq = Number(params.get("z"));
+        const marker = params.get("marker") || "";
+        if (Number.isFinite(lat) && Number.isFinite(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+          focus = { lat, lon, marker };
+          if (Number.isFinite(zq)) z = Math.max(cfg.zoom.min, Math.min(cfg.zoom.max, Math.round(zq)));
+          centerLat = lat;
+          centerLon = lon;
+        }
+      }
+
+      function renderFocusMarker() {
+        if (!focus) {
+          focusMarker.style.display = "none";
+          focusLabel.style.display = "none";
+          return;
+        }
+        const fx = lon2x(focus.lon, z) - originX;
+        const fy = lat2y(focus.lat, z) - originY;
+        if (fx < 0 || fy < 0 || fx > mapEl.clientWidth || fy > mapEl.clientHeight) {
+          focusMarker.style.display = "none";
+          focusLabel.style.display = "none";
+          return;
+        }
+        focusMarker.style.left = `${fx}px`;
+        focusMarker.style.top = `${fy}px`;
+        focusMarker.style.display = "block";
+        if (focus.marker) {
+          focusLabel.textContent = focus.marker;
+          focusLabel.style.left = `${fx}px`;
+          focusLabel.style.top = `${fy}px`;
+          focusLabel.style.display = "block";
+        } else {
+          focusLabel.style.display = "none";
+        }
+      }
+
+      function renderHazardControls() {
+        const layers = cfg.hazard_layers || [];
+        hazardControls.innerHTML = "";
+        layers.forEach((layer, idx) => {
+          if (!activeHazards.size && idx < 2) activeHazards.add(layer.id);
+          const row = document.createElement("label");
+          row.className = "hz-row";
+          row.innerHTML = `<span><input type="checkbox" data-id="${layer.id}" ${activeHazards.has(layer.id) ? "checked" : ""}/> ${layer.name}</span><span>${layer.source}</span>`;
+          hazardControls.appendChild(row);
+        });
+        hazardControls.querySelectorAll("input[type='checkbox']").forEach((el) => {
+          el.addEventListener("change", () => {
+            if (el.checked) activeHazards.add(el.dataset.id);
+            else activeHazards.delete(el.dataset.id);
+            render();
+          });
+        });
+      }
+
+      const tileSrc = (tx, ty) => (mode === "online" ? cfg.tiles.source_template : `../${cfg.tiles.local_template}`).replace("{z}", z).replace("{x}", tx).replace("{y}", ty);
+      const hazardSrc = (layer, tx, ty) => layer.template.replace("{z}", z).replace("{x}", tx).replace("{y}", ty);
+
+      function render() {
+        zoomDisplayEl.textContent = `Zoom: ${z}`;
+        attribEl.innerHTML = `${cfg.tiles.attribution} / mode: ${mode} / <a href="${cfg.tiles.terms_url}" target="_blank" rel="noopener noreferrer">利用規約</a>`;
+        zoomInBtn.disabled = z >= cfg.zoom.max;
+        zoomOutBtn.disabled = z <= cfg.zoom.min;
+
+        clearTiles();
+
+        const w = mapEl.clientWidth;
+        const h = mapEl.clientHeight;
+        const x0 = Math.floor(originX / TILE_SIZE);
+        const y0 = Math.floor(originY / TILE_SIZE);
+        const x1 = Math.floor((originX + w - 1) / TILE_SIZE);
+        const y1 = Math.floor((originY + h - 1) / TILE_SIZE);
+        const maxTiles = Math.pow(2, z);
+
+        let failedTiles = 0;
+        let hazardTried = 0;
+
+        for (let tx = x0; tx <= x1; tx += 1) {
+          for (let ty = y0; ty <= y1; ty += 1) {
+            if (tx < 0 || tx >= maxTiles || ty < 0 || ty >= maxTiles) continue;
+
+            const img = document.createElement("img");
+            img.className = "tile";
+            img.style.left = `${tx * TILE_SIZE - originX}px`;
+            img.style.top = `${ty * TILE_SIZE - originY}px`;
+            img.src = tileSrc(tx, ty);
+            img.onerror = () => {
+              img.style.display = "none";
+              failedTiles += 1;
+              if (mode === "offline" && failedTiles > 0) tileNotice.style.display = "block";
+            };
+            mapEl.appendChild(img);
+
+            (cfg.hazard_layers || []).forEach((layer) => {
+              if (!activeHazards.has(layer.id)) return;
+              hazardTried += 1;
+              const hz = document.createElement("img");
+              hz.className = "hazard-tile";
+              hz.style.left = `${tx * TILE_SIZE - originX}px`;
+              hz.style.top = `${ty * TILE_SIZE - originY}px`;
+              hz.style.opacity = String(layer.opacity ?? 0.5);
+              hz.src = hazardSrc(layer, tx, ty);
+              hz.onerror = () => { hz.style.display = "none"; };
+              mapEl.appendChild(hz);
+            });
+          }
+        }
+
+        if (mode === "online") tileNotice.style.display = "none";
+        hazardStatus.textContent = `表示レイヤー: ${[...activeHazards].join(", ") || "なし"} / タイル描画試行: ${hazardTried}`;
+        updateCenterFromOrigin();
+        coordsEl.textContent = `lat: ${centerLat.toFixed(6)} / lon: ${centerLon.toFixed(6)}`;
+        renderFocusMarker();
+      }
+
+      function setCenter(lat, lon) {
+        centerLat = lat;
+        centerLon = lon;
+        originX = lon2x(lon, z) - mapEl.clientWidth / 2;
+        originY = lat2y(lat, z) - mapEl.clientHeight / 2;
+        clampOrigin();
+        render();
+      }
+
+      function applyZoom(next) {
+        if (next < cfg.zoom.min || next > cfg.zoom.max || next === z) return;
+        z = next;
+        setCenter(centerLat, centerLon);
+      }
+
+      function bindEvents() {
+        zoomInBtn.onclick = () => applyZoom(z + 1);
+        zoomOutBtn.onclick = () => applyZoom(z - 1);
+        resetBtn.onclick = () => { z = cfg.zoom.default; setCenter(cfg.center.lat, cfg.center.lon); };
+        hazardPanelToggle.onclick = () => hazardBody.classList.toggle("collapsed");
+        layersOnBtn.onclick = () => { (cfg.hazard_layers || []).forEach((l) => activeHazards.add(l.id)); renderHazardControls(); render(); };
+        layersOffBtn.onclick = () => { activeHazards.clear(); renderHazardControls(); render(); };
+
+        mapEl.addEventListener("mousedown", (e) => {
+          isDragging = true;
+          dragStart = { x: e.clientX, y: e.clientY };
+          originStart = { x: originX, y: originY };
+          mapEl.classList.add("dragging");
+        });
+        window.addEventListener("mousemove", (e) => {
+          if (!isDragging) return;
+          originX = originStart.x - (e.clientX - dragStart.x);
+          originY = originStart.y - (e.clientY - dragStart.y);
+          clampOrigin();
+          render();
+        });
+        window.addEventListener("mouseup", () => { isDragging = false; mapEl.classList.remove("dragging"); });
+
+        mapEl.addEventListener("wheel", (e) => {
+          e.preventDefault();
+          applyZoom(z + (e.deltaY < 0 ? 1 : -1));
+        }, { passive: false });
+
+        let touchStart = null;
+        mapEl.addEventListener("touchstart", (e) => {
+          if (e.touches.length !== 1) return;
+          touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY, originX, originY };
+        }, { passive: true });
+
+        mapEl.addEventListener("touchmove", (e) => {
+          if (!touchStart || e.touches.length !== 1) return;
+          e.preventDefault();
+          originX = touchStart.originX - (e.touches[0].clientX - touchStart.x);
+          originY = touchStart.originY - (e.touches[0].clientY - touchStart.y);
+          clampOrigin();
+          render();
+        }, { passive: false });
+
+        mapEl.addEventListener("touchend", () => { touchStart = null; });
+        window.addEventListener("resize", () => setCenter(centerLat, centerLon));
+        window.addEventListener("keydown", (e) => {
+          if (e.key === "+" || e.key === "=") applyZoom(z + 1);
+          if (e.key === "-" || e.key === "_") applyZoom(z - 1);
+          if (e.key.toLowerCase() === "r") { z = cfg.zoom.default; setCenter(cfg.center.lat, cfg.center.lon); }
+        });
+      }
+
+      async function init() {
+        try {
+          const r = await fetch(CFG_URL);
+          if (!r.ok) throw new Error(`config.json の読み込み失敗 (${r.status})`);
+          cfg = await r.json();
+          if (!cfg.center || !cfg.zoom || !cfg.tiles || !cfg.tiles.local_template || !cfg.tiles.source_template) {
+            throw new Error("config.json の形式が不正です");
+          }
+
+          modeBadge.textContent = mode === "online" ? "ONLINE" : "OFFLINE";
+          toggleModeLink.textContent = mode === "online" ? "オフライン表示へ" : "オンライン表示へ";
+          toggleModeLink.href = mode === "online" ? "./" : "./?mode=online";
+
+          z = cfg.zoom.default;
+          centerLat = cfg.center.lat;
+          centerLon = cfg.center.lon;
+          parseFocusFromQuery();
+
+          renderHazardControls();
+          bindEvents();
+          loadingOverlay.classList.add("hidden");
+          if (window.innerWidth <= 820) hazardBody.classList.add("collapsed");
+          setCenter(centerLat, centerLon);
+        } catch (err) {
+          showError(`初期化に失敗しました: ${err.message}\n\nネットワーク制限下ではハザードレイヤーが表示できない場合があります。`);
+        }
+      }
+      init();
+    </script>
+  </body>
+</html>
