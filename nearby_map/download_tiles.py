@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download GSI XYZ tiles for offline map with nationwide+local policy."""
+"""Download GSI XYZ tiles for offline map with flexible collection policy."""
 
 from __future__ import annotations
 
@@ -113,23 +113,27 @@ def estimate_tile_count_for_bbox(bbox: dict, zmin: int, zmax: int) -> int:
     return total
 
 
-def bbox_for_zoom(cfg: dict, z: int) -> tuple[dict, str]:
+def bbox_for_zoom(cfg: dict, z: int, scope_mode: str) -> tuple[dict, str]:
+    if scope_mode == "nagoya":
+        return cfg["bbox_wgs84"], "nagoya"
+    if scope_mode == "nationwide":
+        jp = cfg.get("bbox_japan_wgs84", cfg["bbox_wgs84"])
+        return jp, "nationwide"
+
+    # mixed
     policy = cfg.get("offline_collection_policy", {})
     nz = policy.get("nationwide_until_zoom")
     jp = cfg.get("bbox_japan_wgs84")
-
     if isinstance(nz, int) and jp and z <= nz:
         return jp, "nationwide"
     return cfg["bbox_wgs84"], "nagoya"
 
 
-def estimate_mixed_collection(cfg: dict) -> tuple[int, dict[int, tuple[str, int]]]:
-    zmin = cfg["zoom"]["min"]
-    zmax = cfg["zoom"]["max"]
+def estimate_collection(cfg: dict, zmin: int, zmax: int, scope_mode: str) -> tuple[int, dict[int, tuple[str, int]]]:
     by_zoom: dict[int, tuple[str, int]] = {}
     total = 0
     for z in range(zmin, zmax + 1):
-        bbox, scope = bbox_for_zoom(cfg, z)
+        bbox, scope = bbox_for_zoom(cfg, z, scope_mode)
         x0, x1, y0, y1 = normalize_tile_range(bbox, z)
         c = (x1 - x0 + 1) * (y1 - y0 + 1)
         by_zoom[z] = (scope, c)
@@ -157,11 +161,18 @@ def download(url: str, out_path: Path, timeout: int = 30, retry: int = 0) -> str
         return "fail"
 
 
+def clamp_zoom(value: int | None, fallback: int) -> int:
+    return fallback if value is None else value
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Download GSI tiles for offline map")
     parser.add_argument("--sleep", type=float, default=0.05, help="Sleep seconds per request")
     parser.add_argument("--yes", action="store_true", help="Skip confirmation prompt")
     parser.add_argument("--dry-run", action="store_true", help="Only estimate and print plan")
+    parser.add_argument("--zmin", type=int, help="Override min zoom for this execution")
+    parser.add_argument("--zmax", type=int, help="Override max zoom for this execution")
+    parser.add_argument("--scope", choices=["mixed", "nagoya", "nationwide"], default="mixed", help="Collection scope mode")
     args = parser.parse_args()
 
     print("=" * 60)
@@ -179,22 +190,31 @@ def main() -> None:
 
     print("✓ Configuration validated")
 
-    zmin = cfg["zoom"]["min"]
-    zmax = cfg["zoom"]["max"]
+    base_zmin = cfg["zoom"]["min"]
+    base_zmax = cfg["zoom"]["max"]
+    zmin = clamp_zoom(args.zmin, base_zmin)
+    zmax = clamp_zoom(args.zmax, base_zmax)
+    if zmin > zmax:
+        print("❌ --zmin must be <= --zmax")
+        sys.exit(1)
+
     src_tpl = cfg["tiles"]["source_template"]
     local_tpl = cfg["tiles"]["local_template"]
 
-    estimated, by_zoom = estimate_mixed_collection(cfg)
+    estimated, by_zoom = estimate_collection(cfg, zmin, zmax, args.scope)
     nagoya_only = estimate_tile_count_for_bbox(cfg["bbox_wgs84"], zmin, zmax)
 
     print("\nCollection policy:")
+    print(f"  Scope mode: {args.scope}")
     print(f"  Nagoya bbox: {cfg['bbox_wgs84']}")
-    if "bbox_japan_wgs84" in cfg and "offline_collection_policy" in cfg:
+    if "bbox_japan_wgs84" in cfg:
+        print(f"  Nationwide bbox: {cfg['bbox_japan_wgs84']}")
+    if "offline_collection_policy" in cfg:
         nz = cfg["offline_collection_policy"].get("nationwide_until_zoom")
-        print(f"  Nationwide bbox until zoom {nz}: {cfg['bbox_japan_wgs84']}")
+        print(f"  Policy nationwide_until_zoom: {nz}")
     print(f"  Zoom: {zmin} - {zmax}")
     print(f"  Source: {src_tpl}")
-    print(f"\nEstimated tiles (mixed policy): {estimated:,}")
+    print(f"\nEstimated tiles (current mode): {estimated:,}")
     print(f"Estimated tiles (Nagoya only): {nagoya_only:,}")
     print("By zoom:")
     for z in range(zmin, zmax + 1):
@@ -217,7 +237,7 @@ def main() -> None:
     all_start = time.time()
 
     for z in range(zmin, zmax + 1):
-        bbox, scope = bbox_for_zoom(cfg, z)
+        bbox, scope = bbox_for_zoom(cfg, z, args.scope)
         x0, x1, y0, y1 = normalize_tile_range(bbox, z)
 
         z_total = (x1 - x0 + 1) * (y1 - y0 + 1)
