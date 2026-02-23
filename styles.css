@@ -220,3 +220,19 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   .layout { grid-template-columns: 1fr; }
   .result-list { max-height: 40vh; }
 }
+
+
+#mapFrame {
+  width: 100%;
+  min-height: 360px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.canvas.map {
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+#mapMode { width: 100%; }

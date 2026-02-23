@@ -3,22 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>図面・地図検索UIサンプル</title>
+    <title>図面・地図検索UI（実運用版）</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <header class="topbar">
-      <h1>図面・地図検索UI（操作性改善サンプル）</h1>
-      <p>検索UI / サンプル図面 / 地図提示 / 確認しやすさを重視</p>
+      <h1>図面・地図検索UI（実運用向け）</h1>
+      <p>検索結果を図面とオフライン地図へ連携し、現場確認を効率化</p>
     </header>
 
     <main class="layout">
       <section class="panel search-panel" aria-labelledby="search-title">
-        <h2 id="search-title">検索</h2>
+        <h2 id="search-title">設備検索</h2>
         <form id="searchForm" class="search-form">
           <label>
             キーワード
-            <input id="keyword" type="text" placeholder="例: A-102 玄関" />
+            <input id="keyword" type="text" placeholder="例: A-102 玄関 / 分電盤" />
           </label>
 
           <label>
@@ -30,6 +30,13 @@
             </select>
           </label>
 
+          <label>地図モード
+            <select id="mapMode">
+              <option value="offline">オフライン</option>
+              <option value="online">オンライン（確認用）</option>
+            </select>
+          </label>
+
           <div class="actions">
             <button type="submit" class="primary">検索</button>
             <button type="button" id="clearBtn">条件クリア</button>
@@ -37,13 +44,12 @@
         </form>
 
         <div class="quick-filters" aria-label="クイックフィルター">
-          <button class="chip" data-filter="entrance">玄関付近</button>
-          <button class="chip" data-filter="evacuation">避難経路</button>
+          <button class="chip" data-filter="entrance">玄関</button>
+          <button class="chip" data-filter="evacuation">避難設備</button>
           <button class="chip" data-filter="electrical">電気設備</button>
         </div>
 
         <p id="resultMeta" class="meta" aria-live="polite">検索結果: 0件</p>
-
         <ul id="resultList" class="result-list" aria-label="検索結果一覧"></ul>
       </section>
 
@@ -58,24 +64,24 @@
         </div>
 
         <div class="hint">
-          <strong>確認しやすくする工夫:</strong>
-          選択対象の位置を図面と地図で同時にハイライトし、見落としを防ぎます。
+          <strong>運用ポイント:</strong>
+          設備を選択すると、図面セルとオフライン地図（nearby_map）へ同時反映します。
         </div>
 
         <div id="canvasArea" class="canvas-area split">
           <article class="canvas drawing" aria-label="図面表示">
-            <h3>サンプル図面</h3>
+            <h3>図面（セル管理）</h3>
             <div class="grid" id="drawingGrid"></div>
           </article>
 
           <article class="canvas map" aria-label="地図表示">
-            <h3>地図</h3>
-            <div class="mapbox" id="mapBox"></div>
+            <h3>地図（オフライン連携）</h3>
+            <iframe id="mapFrame" title="オフライン地図ビュー" loading="lazy"></iframe>
           </article>
         </div>
 
         <aside class="selection-info" id="selectionInfo">
-          項目を選択すると、図面・地図の該当箇所がここに表示されます。
+          項目を選択すると、図面セル・地図中心・位置マーカーを同期表示します。
         </aside>
       </section>
     </main>

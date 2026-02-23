@@ -1,10 +1,10 @@
 const DATA = [
-  { id: "A-101", name: "玄関ホール", tag: "entrance", building: "north", cell: 2, x: 22, y: 28 },
-  { id: "A-102", name: "受付カウンター", tag: "entrance", building: "north", cell: 7, x: 34, y: 34 },
-  { id: "B-201", name: "避難経路1", tag: "evacuation", building: "south", cell: 18, x: 72, y: 40 },
-  { id: "B-202", name: "避難階段", tag: "evacuation", building: "south", cell: 23, x: 78, y: 62 },
-  { id: "E-301", name: "分電盤", tag: "electrical", building: "north", cell: 14, x: 49, y: 49 },
-  { id: "E-302", name: "電源室", tag: "electrical", building: "south", cell: 20, x: 62, y: 57 },
+  { id: "A-101", name: "玄関ホール", tag: "entrance", building: "north", cell: 2, lat: 35.1706, lon: 136.8808 },
+  { id: "A-102", name: "受付カウンター", tag: "entrance", building: "north", cell: 7, lat: 35.1704, lon: 136.8814 },
+  { id: "B-201", name: "避難経路1", tag: "evacuation", building: "south", cell: 18, lat: 35.1689, lon: 136.8825 },
+  { id: "B-202", name: "避難階段", tag: "evacuation", building: "south", cell: 23, lat: 35.1684, lon: 136.8832 },
+  { id: "E-301", name: "分電盤", tag: "electrical", building: "north", cell: 14, lat: 35.1713, lon: 136.8821 },
+  { id: "E-302", name: "電源室", tag: "electrical", building: "south", cell: 20, lat: 35.1697, lon: 136.8839 },
 ];
 
 const state = {
@@ -13,24 +13,26 @@ const state = {
   quickTag: "",
   selectedId: "",
   viewMode: "split",
+  mapMode: "offline",
 };
 
 const els = {
   form: document.getElementById("searchForm"),
   keyword: document.getElementById("keyword"),
   building: document.getElementById("building"),
+  mapMode: document.getElementById("mapMode"),
   clearBtn: document.getElementById("clearBtn"),
   resultMeta: document.getElementById("resultMeta"),
   resultList: document.getElementById("resultList"),
   drawingGrid: document.getElementById("drawingGrid"),
-  mapBox: document.getElementById("mapBox"),
+  mapFrame: document.getElementById("mapFrame"),
   selectionInfo: document.getElementById("selectionInfo"),
   canvasArea: document.getElementById("canvasArea"),
   tabs: Array.from(document.querySelectorAll(".tab")),
   chips: Array.from(document.querySelectorAll(".chip")),
 };
 
-function createStaticView() {
+function createDrawingGrid() {
   els.drawingGrid.innerHTML = "";
   for (let i = 1; i <= 25; i += 1) {
     const cell = document.createElement("div");
@@ -39,17 +41,6 @@ function createStaticView() {
     cell.textContent = i;
     els.drawingGrid.appendChild(cell);
   }
-
-  els.mapBox.innerHTML = "";
-  DATA.forEach((row) => {
-    const pin = document.createElement("div");
-    pin.className = "pin";
-    pin.dataset.id = row.id;
-    pin.style.left = `${row.x}%`;
-    pin.style.top = `${row.y}%`;
-    pin.title = `${row.id} ${row.name}`;
-    els.mapBox.appendChild(pin);
-  });
 }
 
 function getFilteredData() {
@@ -63,6 +54,18 @@ function getFilteredData() {
   });
 }
 
+function mapUrl(item) {
+  if (!item) return "nearby_map/app/?mode=offline";
+  const params = new URLSearchParams({
+    mode: state.mapMode,
+    lat: String(item.lat),
+    lon: String(item.lon),
+    z: "16",
+    marker: `${item.id} ${item.name}`,
+  });
+  return `nearby_map/app/?${params.toString()}`;
+}
+
 function renderResults() {
   const rows = getFilteredData();
   els.resultMeta.textContent = `検索結果: ${rows.length}件`;
@@ -71,7 +74,7 @@ function renderResults() {
   if (!rows.length) {
     const li = document.createElement("li");
     li.className = "result-item";
-    li.textContent = "該当なし。キーワードや建物条件を変更してください。";
+    li.textContent = "該当なし。条件を変更してください。";
     els.resultList.appendChild(li);
     highlightSelection(null);
     return;
@@ -88,9 +91,7 @@ function renderResults() {
     `;
     els.resultList.appendChild(li);
 
-    if (!state.selectedId && idx === 0) {
-      state.selectedId = row.id;
-    }
+    if (!state.selectedId && idx === 0) state.selectedId = row.id;
   });
 
   const selected = rows.find((r) => r.id === state.selectedId) || rows[0];
@@ -110,34 +111,20 @@ function updateActiveResult() {
 }
 
 function highlightSelection(item) {
-  Array.from(els.drawingGrid.querySelectorAll(".cell")).forEach((cell) => {
-    cell.classList.remove("target");
-  });
-  Array.from(els.mapBox.querySelectorAll(".pin")).forEach((pin) => {
-    pin.classList.remove("target");
-  });
+  Array.from(els.drawingGrid.querySelectorAll(".cell")).forEach((cell) => cell.classList.remove("target"));
 
   if (!item) {
-    els.selectionInfo.textContent = "項目を選択すると、図面・地図の該当箇所がここに表示されます。";
+    els.mapFrame.src = mapUrl(null);
+    els.selectionInfo.textContent = "項目を選択すると、図面セル・地図中心・位置マーカーを同期表示します。";
     return;
   }
 
   const targetCell = els.drawingGrid.querySelector(`.cell[data-index="${item.cell}"]`);
   if (targetCell) targetCell.classList.add("target");
 
-  const targetPin = els.mapBox.querySelector(`.pin[data-id="${item.id}"]`);
-  if (targetPin) targetPin.classList.add("target");
-
-  const tagLabel = {
-    entrance: "玄関系",
-    evacuation: "避難導線",
-    electrical: "電気設備",
-  }[item.tag];
-
-  els.selectionInfo.innerHTML = `
-    <strong>${item.id} ${item.name}</strong><br>
-    図面セル: ${item.cell} / 地図座標: (${item.x}, ${item.y}) / 区分: ${tagLabel}
-  `;
+  els.mapFrame.src = mapUrl(item);
+  const tagLabel = { entrance: "玄関", evacuation: "避難", electrical: "電気" }[item.tag] || item.tag;
+  els.selectionInfo.innerHTML = `<strong>${item.id} ${item.name}</strong><br>図面セル: ${item.cell} / 建物: ${item.building === "north" ? "北棟" : "南棟"} / 種別: ${tagLabel}`;
 }
 
 function applyViewMode() {
@@ -158,6 +145,7 @@ function bindEvents() {
     e.preventDefault();
     state.keyword = els.keyword.value;
     state.building = els.building.value;
+    state.mapMode = els.mapMode.value;
     state.selectedId = "";
     renderResults();
   });
@@ -169,6 +157,8 @@ function bindEvents() {
     state.selectedId = "";
     els.keyword.value = "";
     els.building.value = "all";
+    els.mapMode.value = "offline";
+    state.mapMode = "offline";
     renderResults();
   });
 
@@ -188,6 +178,12 @@ function bindEvents() {
     });
   });
 
+  els.mapMode.addEventListener("change", () => {
+    state.mapMode = els.mapMode.value;
+    const item = getFilteredData().find((r) => r.id === state.selectedId);
+    highlightSelection(item || null);
+  });
+
   els.chips.forEach((chip) => {
     chip.addEventListener("click", () => {
       state.quickTag = chip.dataset.filter === state.quickTag ? "" : chip.dataset.filter;
@@ -198,7 +194,7 @@ function bindEvents() {
   });
 }
 
-createStaticView();
+createDrawingGrid();
 bindEvents();
 applyViewMode();
 renderResults();

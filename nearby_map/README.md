@@ -74,6 +74,15 @@ py -3 download_tiles.py --dry-run
 py -3 -m http.server 8000
 ```
 
+または、同梱のバッチを実行してください（推奨）。
+
+```powershell
+cd nearby_map
+.\run_validate.bat
+.\run_dryrun.bat
+.\run_server.bat
+```
+
 ### `py` も使えない場合
 
 1. Python公式サイトからPython 3.10+ をインストール
@@ -101,3 +110,20 @@ Microsoft Store のエイリアスが邪魔する場合は、
 
 - ハザードレイヤーを `全ON` / `全OFF` で一括切替可能
 - キーボード操作: `+`/`-` でズーム、`r` で中心リセット
+
+
+## Windowsでの最短確認（非エンジニア向け）
+
+1. `nearby_map` フォルダを開く
+2. `run_validate.bat` を実行
+3. `run_dryrun.bat` を実行
+4. `run_server.bat` を実行
+5. ブラウザで `http://localhost:8000/app/?mode=online` を開く
+
+
+## 図面検索UIとの連携（ルート `index.html`）
+
+- ルートの `index.html` は、設備検索結果を `nearby_map/app` に連携します。
+- 検索結果を選ぶと、`lat/lon/z/marker` をクエリで渡して地図中心と位置マーカーを同期します。
+- 地図モードは「オフライン / オンライン（確認用）」を選択可能です。
+- オフラインで実用する場合は、先に `download_tiles.py` でタイル収集を完了してください。

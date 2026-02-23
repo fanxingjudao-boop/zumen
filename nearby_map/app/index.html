@@ -52,6 +52,30 @@
         pointer-events: none;
       }
       .hazard-tile { mix-blend-mode: multiply; }
+      #focusMarker {
+        position: absolute;
+        z-index: 1500;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #dc2626;
+        border: 2px solid #fff;
+        box-shadow: 0 0 0 2px rgba(220,38,38,.35);
+        transform: translate(-50%, -50%);
+        display: none;
+      }
+      #focusLabel {
+        position: absolute;
+        z-index: 1501;
+        transform: translate(-50%, -120%);
+        background: rgba(255,255,255,.95);
+        border: 1px solid #fca5a5;
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 12px;
+        white-space: nowrap;
+        display: none;
+      }
       #hazardPanel {
         position: absolute;
         right: 10px;
@@ -157,6 +181,8 @@
         </div>
       </aside>
 
+      <div id="focusMarker"></div>
+      <div id="focusLabel"></div>
       <div id="attrib"></div>
       <div id="coords"></div>
     </div>
@@ -164,7 +190,8 @@
     <script>
       const CFG_URL = "../config.json";
       const TILE_SIZE = 256;
-      const mode = new URLSearchParams(location.search).get("mode") === "online" ? "online" : "offline";
+      const params = new URLSearchParams(location.search);
+      const mode = params.get("mode") === "online" ? "online" : "offline";
 
       const mapEl = document.getElementById("map");
       const hazardControls = document.getElementById("hazardControls");
@@ -185,9 +212,12 @@
       const modeBadge = document.getElementById("modeBadge");
       const toggleModeLink = document.getElementById("toggleModeLink");
       const tileNotice = document.getElementById("tileNotice");
+      const focusMarker = document.getElementById("focusMarker");
+      const focusLabel = document.getElementById("focusLabel");
 
       let cfg, z, centerLat, centerLon, originX = 0, originY = 0, isDragging = false, dragStart = null, originStart = null;
       let activeHazards = new Set();
+      let focus = null;
 
       const lon2x = (lon, zoom) => (lon + 180) / 360 * (TILE_SIZE * Math.pow(2, zoom));
       const lat2y = (lat, zoom) => {
@@ -224,6 +254,46 @@
         const cy = originY + mapEl.clientHeight / 2;
         centerLon = x2lon(cx, z);
         centerLat = y2lat(cy, z);
+      }
+
+      
+      function parseFocusFromQuery() {
+        const lat = Number(params.get("lat"));
+        const lon = Number(params.get("lon"));
+        const zq = Number(params.get("z"));
+        const marker = params.get("marker") || "";
+        if (Number.isFinite(lat) && Number.isFinite(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+          focus = { lat, lon, marker };
+          if (Number.isFinite(zq)) z = Math.max(cfg.zoom.min, Math.min(cfg.zoom.max, Math.round(zq)));
+          centerLat = lat;
+          centerLon = lon;
+        }
+      }
+
+      function renderFocusMarker() {
+        if (!focus) {
+          focusMarker.style.display = "none";
+          focusLabel.style.display = "none";
+          return;
+        }
+        const fx = lon2x(focus.lon, z) - originX;
+        const fy = lat2y(focus.lat, z) - originY;
+        if (fx < 0 || fy < 0 || fx > mapEl.clientWidth || fy > mapEl.clientHeight) {
+          focusMarker.style.display = "none";
+          focusLabel.style.display = "none";
+          return;
+        }
+        focusMarker.style.left = `${fx}px`;
+        focusMarker.style.top = `${fy}px`;
+        focusMarker.style.display = "block";
+        if (focus.marker) {
+          focusLabel.textContent = focus.marker;
+          focusLabel.style.left = `${fx}px`;
+          focusLabel.style.top = `${fy}px`;
+          focusLabel.style.display = "block";
+        } else {
+          focusLabel.style.display = "none";
+        }
       }
 
       function renderHazardControls() {
@@ -302,6 +372,7 @@
         hazardStatus.textContent = `表示レイヤー: ${[...activeHazards].join(", ") || "なし"} / タイル描画試行: ${hazardTried}`;
         updateCenterFromOrigin();
         coordsEl.textContent = `lat: ${centerLat.toFixed(6)} / lon: ${centerLon.toFixed(6)}`;
+        renderFocusMarker();
       }
 
       function setCenter(lat, lon) {
@@ -387,6 +458,7 @@
           z = cfg.zoom.default;
           centerLat = cfg.center.lat;
           centerLon = cfg.center.lon;
+          parseFocusFromQuery();
 
           renderHazardControls();
           bindEvents();

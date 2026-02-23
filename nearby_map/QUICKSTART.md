@@ -58,3 +58,15 @@ python3 download_tiles.py --dry-run
 ```
 
 `z12までは全国、z13以上は名古屋` の方針で枚数が表示されます。
+
+
+## Windowsワンクリック手順
+
+```powershell
+cd nearby_map
+.\run_validate.bat
+.\run_dryrun.bat
+.\run_server.bat
+```
+
+表示確認: `http://localhost:8000/app/?mode=online`
