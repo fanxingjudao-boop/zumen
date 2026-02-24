@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <rect width="960" height="540" fill="#f8fafc"/>
+  <rect x="70" y="60" width="820" height="420" fill="#ffffff" stroke="#0f172a" stroke-width="4"/>
+  <text x="80" y="42" font-size="28" font-weight="700" fill="#0f172a">電気配線図 E-01（サンプル資料）</text>
+  <path d="M120 130 H820" stroke="#0f766e" stroke-width="6" fill="none"/>
+  <path d="M120 220 H820" stroke="#0f766e" stroke-width="6" fill="none"/>
+  <path d="M120 310 H820" stroke="#0f766e" stroke-width="6" fill="none"/>
+  <path d="M220 130 V370" stroke="#475569" stroke-width="5" fill="none"/>
+  <path d="M420 130 V370" stroke="#475569" stroke-width="5" fill="none"/>
+  <path d="M620 130 V370" stroke="#475569" stroke-width="5" fill="none"/>
+  <circle cx="620" cy="220" r="16" fill="#f59e0b"/>
+  <text x="650" y="228" font-size="20" fill="#78350f">分電盤</text>
+</svg>

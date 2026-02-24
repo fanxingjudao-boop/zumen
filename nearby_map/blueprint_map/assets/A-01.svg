@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <rect width="960" height="540" fill="#f8fafc"/>
+  <rect x="80" y="70" width="800" height="400" fill="#fff" stroke="#0f172a" stroke-width="4"/>
+  <rect x="120" y="110" width="220" height="130" fill="#e0f2fe" stroke="#0284c7"/>
+  <text x="145" y="180" font-size="24" fill="#0c4a6e">配管室</text>
+  <rect x="380" y="110" width="220" height="130" fill="#dcfce7" stroke="#16a34a"/>
+  <text x="405" y="180" font-size="24" fill="#14532d">機械室</text>
+  <rect x="640" y="110" width="200" height="130" fill="#fee2e2" stroke="#dc2626"/>
+  <text x="690" y="180" font-size="24" fill="#7f1d1d">玄関</text>
+  <line x1="120" y1="300" x2="840" y2="300" stroke="#64748b" stroke-width="8"/>
+  <circle cx="700" cy="300" r="18" fill="#dc2626"/>
+  <text x="80" y="40" font-size="28" font-weight="700" fill="#0f172a">配管図 A-01（サンプル資料）</text>
+</svg>

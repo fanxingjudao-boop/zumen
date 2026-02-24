@@ -3,63 +3,226 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>図面マップUI（サンプル）</title>
+    <title>図面マップUI（実運用版）</title>
     <style>
-      body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f8fafc; color:#0f172a; }
-      header { padding: 16px 20px; background:#0f172a; color:#fff; }
-      nav { display:flex; gap:8px; padding: 10px 16px; background:#fff; border-bottom:1px solid #e2e8f0; }
-      .tab { border:1px solid #cbd5e1; background:#fff; border-radius:8px; padding:8px 12px; cursor:pointer; }
-      .tab.active { background:#dbeafe; border-color:#93c5fd; color:#1d4ed8; font-weight:700; }
-      main { padding: 16px; }
-      .blueprint-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
-      .blueprint-card { background:#fff; border:1px solid #cbd5e1; border-radius:12px; padding:12px; cursor:pointer; }
-      .icon { font-size: 28px; }
-      .title { margin-top: 8px; font-weight:600; }
-      .meta { color:#475569; font-size:0.9rem; margin-top:4px; }
-      .new-tab-icon { margin-left:4px; opacity:0.7; }
+      body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f8fafc; color: #0f172a; }
+      header { padding: 16px 20px; background: #0f172a; color: #fff; }
+      header h1 { margin: 0 0 6px; }
+      nav { display: flex; gap: 8px; padding: 10px 16px; background: #fff; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; }
+      .tab { border: 1px solid #cbd5e1; background: #fff; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+      .tab.active { background: #dbeafe; border-color: #93c5fd; color: #1d4ed8; font-weight: 700; }
+      .layout { display: grid; grid-template-columns: 360px 1fr; gap: 12px; padding: 12px; }
+      .panel { background: #fff; border: 1px solid #cbd5e1; border-radius: 12px; padding: 12px; }
+      .search { display: grid; gap: 8px; }
+      .search input, .search select, .search button { border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; }
+      .search button { cursor: pointer; }
+      .blueprint-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 68vh; overflow: auto; }
+      .bp-item { border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px; }
+      .bp-item.active { border-color: #2563eb; background: #eff6ff; }
+      .bp-item button { width: 100%; text-align: left; border: 0; background: transparent; padding: 0; cursor: pointer; }
+      .bp-title { font-weight: 700; }
+      .bp-meta { color: #475569; font-size: 0.88rem; margin-top: 4px; }
+      .viewer { display: grid; gap: 10px; }
+      #previewFrame { width: 100%; min-height: 46vh; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; }
+      .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+      .actions button { border: 1px solid #cbd5e1; background: #fff; border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+      .actions .primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+      .hint { font-size: 0.9rem; color: #334155; background: #f8fafc; border-left: 4px solid #3b82f6; padding: 8px; }
+      @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } .blueprint-list { max-height: 34vh; } }
     </style>
   </head>
   <body>
     <header>
-      <h1>図面マップ（サンプル）</h1>
-      <p>将来の図面DB連携を想定したUI雛形です。</p>
+      <h1>図面マップ（実運用版）</h1>
+      <p>サンプル資料を読み込み、図面確認・設備検索・地図連携を実際に行えます。</p>
     </header>
 
     <nav>
       <button class="tab active" type="button">📋 図面一覧</button>
-      <button class="tab" type="button">🔍 検索</button>
-      <button class="tab" type="button">⚙️ 設定</button>
-      <button class="tab" type="button" onclick="openNearbyMap()">🗺️ 周辺地図<span class="new-tab-icon">↗</span></button>
+      <button class="tab" type="button" onclick="focusKeyword('避難')">🔍 避難設備検索</button>
+      <button class="tab" type="button" onclick="resetFilters()">⚙️ 条件リセット</button>
+      <button class="tab" type="button" onclick="openNearbyMap()">🗺️ 周辺地図<span style="margin-left:4px;opacity:.7">↗</span></button>
     </nav>
 
-    <main>
-      <div class="blueprint-grid">
-        <div class="blueprint-card" onclick="notifyFutureFeature()">
-          <div class="icon">📄</div>
-          <div class="title">配管図 A-01</div>
-          <div class="meta">中央エリア / 1F</div>
+    <main class="layout">
+      <section class="panel">
+        <div class="search">
+          <input id="keyword" type="text" placeholder="図面ID / 名称 / 建物 / 階を検索" />
+          <select id="building">
+            <option value="all">建物: すべて</option>
+            <option value="north">北棟</option>
+            <option value="south">南棟</option>
+          </select>
+          <button id="searchBtn" class="primary">検索</button>
         </div>
-        <div class="blueprint-card" onclick="notifyFutureFeature()">
-          <div class="icon">📄</div>
-          <div class="title">電気配線図 E-01</div>
-          <div class="meta">中央エリア / B1F</div>
+        <p id="meta" class="bp-meta" aria-live="polite"></p>
+        <ul id="list" class="blueprint-list"></ul>
+      </section>
+
+      <section class="panel viewer">
+        <div class="hint">図面を選択すると、資料プレビュー・地図連携・ルート検索画面への往復が可能です。</div>
+        <iframe id="previewFrame" title="図面プレビュー" loading="lazy"></iframe>
+        <div id="detail" class="bp-meta"></div>
+        <div class="actions">
+          <button id="openMapBtn" class="primary">この図面の地点を地図で開く</button>
+          <button id="openRootBtn">図面検索UI（ルート）で開く</button>
+          <button id="openMapInPanelBtn">地図を右ペインで開く</button>
         </div>
-        <div class="blueprint-card" onclick="notifyFutureFeature()">
-          <div class="icon">📄</div>
-          <div class="title">防災設備図 F-02</div>
-          <div class="meta">南棟 / 2F</div>
-        </div>
-      </div>
+      </section>
     </main>
 
     <script>
-      function openNearbyMap() {
-        window.open('../../app/index.html', '_blank');
+      const BLUEPRINTS = [
+        { id: 'A-01', title: '配管図 A-01', building: 'north', floor: '1F', lat: 35.1706, lon: 136.8808, marker: 'A-01 配管図', file: '../assets/A-01.svg' },
+        { id: 'E-01', title: '電気配線図 E-01', building: 'north', floor: 'B1F', lat: 35.1713, lon: 136.8821, marker: 'E-01 電気配線図', file: '../assets/E-01.svg' },
+        { id: 'F-02', title: '防災設備図 F-02', building: 'south', floor: '2F', lat: 35.1689, lon: 136.8825, marker: 'F-02 防災設備図', file: '../assets/F-02.svg' },
+      ];
+
+      const els = {
+        keyword: document.getElementById('keyword'),
+        building: document.getElementById('building'),
+        searchBtn: document.getElementById('searchBtn'),
+        list: document.getElementById('list'),
+        meta: document.getElementById('meta'),
+        previewFrame: document.getElementById('previewFrame'),
+        detail: document.getElementById('detail'),
+        openMapBtn: document.getElementById('openMapBtn'),
+        openRootBtn: document.getElementById('openRootBtn'),
+        openMapInPanelBtn: document.getElementById('openMapInPanelBtn'),
+      };
+
+      const query = new URLSearchParams(location.search);
+      const state = {
+        keyword: query.get('keyword') || '',
+        building: query.get('building') || 'all',
+        selectedId: '',
+      };
+
+      function filtered() {
+        return BLUEPRINTS.filter((bp) => {
+          const kw = state.keyword.trim().toLowerCase();
+          const target = `${bp.id} ${bp.title} ${bp.floor} ${bp.building}`.toLowerCase();
+          const k = !kw || target.includes(kw);
+          const b = state.building === 'all' || bp.building === state.building;
+          return k && b;
+        });
       }
 
-      function notifyFutureFeature() {
-        alert('図面詳細機能は今後実装予定です。');
+      function selectBlueprint(bp) {
+        state.selectedId = bp.id;
+        els.previewFrame.src = bp.file;
+        els.detail.textContent = `${bp.title} / ${bp.building === 'north' ? '北棟' : '南棟'} / ${bp.floor} / 位置(${bp.lat.toFixed(4)}, ${bp.lon.toFixed(4)})`;
+        renderList();
       }
+
+      function renderList() {
+        const rows = filtered();
+        els.list.innerHTML = '';
+        els.meta.textContent = `検索結果: ${rows.length}件`;
+
+        if (!rows.length) {
+          const li = document.createElement('li');
+          li.className = 'bp-item';
+          li.textContent = '該当する図面がありません。';
+          els.list.appendChild(li);
+          els.previewFrame.src = '';
+          els.detail.textContent = '';
+          return;
+        }
+
+        rows.forEach((bp, idx) => {
+          if (!state.selectedId && idx === 0) state.selectedId = bp.id;
+          const li = document.createElement('li');
+          li.className = `bp-item${state.selectedId === bp.id ? ' active' : ''}`;
+          li.innerHTML = `<button type="button" data-id="${bp.id}"><div class="bp-title">${bp.title}</div><div class="bp-meta">${bp.building === 'north' ? '北棟' : '南棟'} / ${bp.floor}</div></button>`;
+          els.list.appendChild(li);
+        });
+
+        const selected = rows.find((r) => r.id === state.selectedId) || rows[0];
+        if (selected) {
+          if (els.previewFrame.src !== new URL(selected.file, location.href).href) {
+            els.previewFrame.src = selected.file;
+          }
+          els.detail.textContent = `${selected.title} / ${selected.building === 'north' ? '北棟' : '南棟'} / ${selected.floor} / 位置(${selected.lat.toFixed(4)}, ${selected.lon.toFixed(4)})`;
+        }
+      }
+
+      function selectedBlueprint() {
+        return BLUEPRINTS.find((b) => b.id === state.selectedId) || null;
+      }
+
+      function openNearbyMap() {
+        const bp = selectedBlueprint() || BLUEPRINTS[0];
+        const q = new URLSearchParams({ mode: 'offline', lat: String(bp.lat), lon: String(bp.lon), z: '16', marker: bp.marker, blueprintId: bp.id, building: bp.building, source: 'blueprint' });
+        window.open(`../../app/index.html?${q.toString()}`, '_blank');
+      }
+
+      function openRootSearch() {
+        const bp = selectedBlueprint();
+        if (!bp) return;
+        const q = new URLSearchParams({ keyword: bp.id, building: bp.building, mapMode: 'offline' });
+        window.open(`../../../index.html?${q.toString()}`, '_blank');
+      }
+
+      function openMapInPanel() {
+        const bp = selectedBlueprint();
+        if (!bp) return;
+        const q = new URLSearchParams({
+          mode: 'offline',
+          lat: String(bp.lat),
+          lon: String(bp.lon),
+          z: '16',
+          marker: bp.marker,
+          blueprintId: bp.id,
+          building: bp.building,
+          source: 'blueprint'
+        });
+        location.href = `../../app/index.html?${q.toString()}`;
+      }
+
+      function focusKeyword(word) {
+        els.keyword.value = word;
+        state.keyword = word;
+        renderList();
+      }
+
+      function resetFilters() {
+        state.keyword = '';
+        state.building = 'all';
+        state.selectedId = '';
+        els.keyword.value = '';
+        els.building.value = 'all';
+        renderList();
+      }
+
+      els.searchBtn.addEventListener('click', () => {
+        state.keyword = els.keyword.value;
+        state.building = els.building.value;
+        state.selectedId = '';
+        renderList();
+      });
+
+      els.list.addEventListener('click', (e) => {
+        const button = e.target.closest('button[data-id]');
+        if (!button) return;
+        const bp = BLUEPRINTS.find((x) => x.id === button.dataset.id);
+        if (bp) selectBlueprint(bp);
+      });
+
+      els.openMapBtn.addEventListener('click', openNearbyMap);
+      els.openRootBtn.addEventListener('click', openRootSearch);
+      els.openMapInPanelBtn.addEventListener('click', openMapInPanel);
+
+      window.focusKeyword = focusKeyword;
+      window.resetFilters = resetFilters;
+      window.openNearbyMap = openNearbyMap;
+
+      els.keyword.value = state.keyword;
+      if ([...els.building.options].some(o => o.value === state.building)) {
+        els.building.value = state.building;
+      }
+
+      renderList();
     </script>
   </body>
 </html>

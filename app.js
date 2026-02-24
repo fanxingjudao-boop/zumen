@@ -7,13 +7,15 @@ const DATA = [
   { id: "E-302", name: "電源室", tag: "electrical", building: "south", cell: 20, lat: 35.1697, lon: 136.8839 },
 ];
 
+const initialParams = new URLSearchParams(window.location.search);
+
 const state = {
   keyword: "",
   building: "all",
   quickTag: "",
   selectedId: "",
   viewMode: "split",
-  mapMode: "offline",
+  mapMode: initialParams.get("mapMode") || "offline",
 };
 
 const els = {
@@ -30,6 +32,8 @@ const els = {
   canvasArea: document.getElementById("canvasArea"),
   tabs: Array.from(document.querySelectorAll(".tab")),
   chips: Array.from(document.querySelectorAll(".chip")),
+  openBlueprintBtn: document.getElementById("openBlueprintBtn"),
+  openMapNewTabBtn: document.getElementById("openMapNewTabBtn"),
 };
 
 function createDrawingGrid() {
@@ -62,8 +66,15 @@ function mapUrl(item) {
     lon: String(item.lon),
     z: "16",
     marker: `${item.id} ${item.name}`,
+    blueprintId: item.id,
+    building: item.building,
+    source: "root",
   });
   return `nearby_map/app/?${params.toString()}`;
+}
+
+function selectedItem() {
+  return getFilteredData().find((r) => r.id === state.selectedId) || null;
 }
 
 function renderResults() {
@@ -180,8 +191,7 @@ function bindEvents() {
 
   els.mapMode.addEventListener("change", () => {
     state.mapMode = els.mapMode.value;
-    const item = getFilteredData().find((r) => r.id === state.selectedId);
-    highlightSelection(item || null);
+    highlightSelection(selectedItem());
   });
 
   els.chips.forEach((chip) => {
@@ -192,7 +202,32 @@ function bindEvents() {
       els.chips.forEach((c) => c.classList.toggle("active", c === chip && state.quickTag));
     });
   });
+
+  els.openBlueprintBtn?.addEventListener("click", () => {
+    const item = selectedItem();
+    const q = new URLSearchParams({
+      keyword: item ? item.id : state.keyword,
+      building: item ? item.building : state.building,
+      source: "root",
+    });
+    window.open(`nearby_map/blueprint_map/app/?${q.toString()}`, "_blank");
+  });
+
+  els.openMapNewTabBtn?.addEventListener("click", () => {
+    const item = selectedItem();
+    window.open(mapUrl(item), "_blank");
+  });
 }
+
+if (initialParams.get("keyword")) {
+  state.keyword = initialParams.get("keyword") || "";
+  if (els.keyword) els.keyword.value = state.keyword;
+}
+if (initialParams.get("building") && els.building) {
+  state.building = initialParams.get("building");
+  els.building.value = state.building;
+}
+if (els.mapMode) els.mapMode.value = state.mapMode;
 
 createDrawingGrid();
 bindEvents();
