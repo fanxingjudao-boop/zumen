@@ -65,28 +65,29 @@ python3 -m http.server 8000
 
 ## Windows（PowerShell）での実行
 
-`python3` が見つからない場合は、Windows では `py` ランチャーを使ってください。
+`python3` が無い環境でも動くように、`run.bat` に統一しました。
+
+### 実行フロー（推奨）
 
 ```powershell
-cd nearby_map
-py -3 validate_config.py
-py -3 download_tiles.py --dry-run
-py -3 -m http.server 8000
-```
+# どちらでも可
+# 1) repo直下: C:\...\zumen-main
+# 2) nearby_map配下: C:\...\zumen-main\nearby_map
 
-または、同梱のバッチを実行してください（推奨）。
-
-```powershell
-cd nearby_map
 .\run_validate.bat
 .\run_dryrun.bat
 .\run_server.bat
 ```
 
-> 補足: リポジトリ直下 (`zumen-main`) にも同名の `run_*.bat` を配置しました。
-> `zumen-main` にいる場合は `./run_validate.bat` のように実行できます。
-> `nearby_map` 配下にいる場合は `./run_validate.bat`（同名）で実行できます。
+### 直接サブコマンド実行（上級者向け）
 
+```powershell
+cd nearby_map
+.\run.bat validate
+.\run.bat dryrun
+.\run.bat server
+.\run.bat download --yes
+```
 
 ### `py` も使えない場合
 
@@ -102,7 +103,6 @@ python --version
 
 Microsoft Store のエイリアスが邪魔する場合は、
 `設定 > アプリ > アプリ実行エイリアス` で `python.exe` / `python3.exe` をオフにしてください。
-
 
 ## 全国+名古屋のハイブリッド収集方針
 
@@ -121,7 +121,7 @@ Microsoft Store のエイリアスが邪魔する場合は、
 
 ## Windowsでの最短確認（非エンジニア向け）
 
-1. `nearby_map` フォルダを開く
+1. `zumen-main` を開く
 2. `run_validate.bat` を実行
 3. `run_dryrun.bat` を実行
 4. `run_server.bat` を実行

@@ -1,4 +1,4 @@
 @echo off
 setlocal
-call "%~dp0nearby_map\run_validate.bat"
+call "%~dp0nearby_map\run.bat" validate
 exit /b %errorlevel%
