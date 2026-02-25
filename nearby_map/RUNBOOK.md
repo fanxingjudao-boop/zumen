@@ -30,7 +30,7 @@ py -3 --version
 python --version
 ```
 
-`python3` が見つからない場合は `run_*.bat` を利用してください。
+`python3` が見つからない場合は `run.bat` / `run_*.bat` を利用してください。
 
 ---
 
@@ -44,8 +44,11 @@ python3 validate_config.py
 Windows:
 
 ```powershell
-cd nearby_map
+# repo直下でも nearby_map配下でも実行可
 .\run_validate.bat
+# または
+cd nearby_map
+.\run.bat validate
 ```
 
 成功条件:
@@ -63,6 +66,9 @@ Windows:
 
 ```powershell
 .\run_dryrun.bat
+# または
+cd nearby_map
+.\run.bat dryrun
 ```
 
 確認ポイント:
@@ -81,7 +87,8 @@ python3 download_tiles.py --yes
 Windows:
 
 ```powershell
-py -3 download_tiles.py --yes
+cd nearby_map
+.\run.bat download --yes
 ```
 
 ### 小さく動作確認したい場合（推奨）
@@ -176,3 +183,23 @@ python3 -m http.server 8000
 - プロキシ/ファイアウォール制限を確認
 - 別ネットワークで再実行
 
+
+
+> 補足: リポジトリ直下 (`zumen-main`) にも同名の `run_*.bat` を配置しました。
+> `zumen-main` にいる場合は `./run_validate.bat` のように実行できます。
+> `nearby_map` 配下にいる場合は `./run_validate.bat`（同名）で実行できます。
+
+
+---
+
+## 10. Windowsランチャー仕様（統一）
+
+- 実体: `nearby_map/run.bat`
+- 互換ショートカット: `run_validate.bat`, `run_dryrun.bat`, `run_server.bat`（repo直下/nearby_map両方）
+- サブコマンド:
+  - `run.bat validate`
+  - `run.bat dryrun`
+  - `run.bat server`
+  - `run.bat download --yes`
+
+これにより「どこで実行するか」に依存せず同じ手順で運用できます。

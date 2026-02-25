@@ -1,4 +1,4 @@
 @echo off
 setlocal
-call "%~dp0run.bat" validate
+call "%~dp0nearby_map\run.bat" dryrun
 exit /b %errorlevel%

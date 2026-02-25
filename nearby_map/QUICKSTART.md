@@ -1,72 +1,75 @@
-# QUICKSTART
+# QUICKSTART（最短実行フロー）
 
-## 1) 設定検証
+## 0. 前提
 
+- 場所: `zumen-main` または `zumen-main/nearby_map`
+- Windows では `run.bat` 系を使うと Python コマンド差異を吸収できます。
+
+## 1. 設定検証
+
+### Windows
+```powershell
+# repo直下でも nearby_map 配下でも可
+.\run_validate.bat
+```
+
+### macOS/Linux
 ```bash
 cd nearby_map
 python3 validate_config.py
 ```
 
-## 2) ダウンロード計画確認
+## 2. ダウンロード枚数の確認（必須）
 
+### Windows
+```powershell
+.\run_dryrun.bat
+```
+
+### macOS/Linux
 ```bash
+cd nearby_map
 python3 download_tiles.py --dry-run
 ```
 
-## 3) タイル取得
+## 3. タイル収集
 
+### Windows
+```powershell
+cd nearby_map
+.\run.bat download --yes
+```
+
+### macOS/Linux
 ```bash
+cd nearby_map
 python3 download_tiles.py --yes
 ```
 
-## 4) サーバー起動
+## 4. 起動
 
-```bash
-python3 -m http.server 8000
-```
-
-## 5) ブラウザで確認
-
-- `http://localhost:8000/app/`
-- `http://localhost:8000/blueprint_map/app/`
-
-
-## 公開URLで確認する場合
-
-- `.../app/?mode=online` でオンラインタイル表示
-
-- 公開前に `config.json` の `tiles.terms_url` から利用規約を確認
-
-
-## Windowsで `python3` が使えない場合
-
-PowerShell では次を使ってください。
-
+### Windows
 ```powershell
-py -3 validate_config.py
-py -3 download_tiles.py --dry-run
-py -3 -m http.server 8000
-```
-
-`py` がない場合はPythonをインストールし、`Add python.exe to PATH` を有効にしてください。
-
-
-## ズーム別の収集範囲を確認
-
-```bash
-python3 download_tiles.py --dry-run
-```
-
-`z12までは全国、z13以上は名古屋` の方針で枚数が表示されます。
-
-
-## Windowsワンクリック手順
-
-```powershell
-cd nearby_map
-.\run_validate.bat
-.\run_dryrun.bat
 .\run_server.bat
 ```
 
-表示確認: `http://localhost:8000/app/?mode=online`
+### macOS/Linux
+```bash
+cd nearby_map
+python3 -m http.server 8000
+```
+
+## 5. 画面確認
+
+- 地図: `http://localhost:8000/app/`
+- 図面: `http://localhost:8000/blueprint_map/app/`
+- オンライン確認: `http://localhost:8000/app/?mode=online`
+
+## 6. Windows向け補足
+
+- 1つに統一したランチャー: `nearby_map/run.bat`
+- サブコマンド:
+  - `run.bat validate`
+  - `run.bat dryrun`
+  - `run.bat server`
+  - `run.bat download --yes`
